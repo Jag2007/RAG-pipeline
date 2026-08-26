@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Q&amp;A</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>PDF Q&amp;A</h1>
+    <p>Upload a PDF, ask a question, and get an answer that cites the page it came from.</p>
+    <span id="status" class="status">Checking models…</span>
+  </header>
+
+  <main>
+    <aside class="panel">
+      <h2>Documents</h2>
+      <label class="upload">
+        <input type="file" id="file" accept="application/pdf" />
+        <span id="upload-label">Choose a PDF</span>
+      </label>
+      <ul id="documents"></ul>
+    </aside>
+
+    <section class="panel chat">
+      <div id="messages">
+        <p class="hint">Answers only use what is in your PDFs. If the answer is not there, it says so.</p>
+      </div>
+      <form id="ask-form">
+        <input id="question" placeholder="Ask about your PDF…" autocomplete="off" />
+        <button type="submit">Ask</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
