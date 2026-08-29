@@ -1,0 +1,41 @@
+{
+  "pdf": "sample_manual.pdf",
+  "answerable": [
+    {"question": "How powerful is the motor?", "evidence": "250 W rear hub motor"},
+    {"question": "How much energy does the battery store in watt-hours?", "evidence": "624 Wh"},
+    {"question": "How far can I ride on one charge?", "evidence": "60 to 90 km"},
+    {"question": "Which frame size should someone who is 180 cm tall pick?", "evidence": "L (riders 175-190 cm)"},
+    {"question": "What is the heaviest rider plus luggage the bike can carry?", "evidence": "120 kg"},
+    {"question": "How do I turn on the headlight?", "evidence": "front light on"},
+    {"question": "Which mode should I use to climb a steep hill?", "evidence": "Level 5 (Turbo)"},
+    {"question": "Does the motor still help me above 25 km/h?", "evidence": "Assistance stops automatically at 25 km/h"},
+    {"question": "How can the bike help me push it up a ramp?", "evidence": "Walk mode"},
+    {"question": "Is it okay to use a pressure washer to clean the bike?", "evidence": "pressure washer"},
+    {"question": "How long does it take to fully charge an empty battery?", "evidence": "4.5 hours"},
+    {"question": "Can I charge the battery when it is freezing cold?", "evidence": "below 0 degrees"},
+    {"question": "How should I store the battery over the winter?", "evidence": "60 percent charge"},
+    {"question": "How many charge cycles will the battery last?", "evidence": "800 full charge cycles"},
+    {"question": "What does E-12 mean?", "evidence": "E-12: Motor overheating"},
+    {"question": "The display shows E-21, how do I fix it?", "evidence": "E-21: Speed sensor fault"},
+    {"question": "What should I do about error E-52?", "evidence": "E-52: Torque sensor fault"},
+    {"question": "What is the support phone number?", "evidence": "1800-555-0136"},
+    {"question": "What tyre pressure should I use?", "evidence": "between 40 and 55 psi"},
+    {"question": "How often should the chain be oiled?", "evidence": "every 300 km"},
+    {"question": "When do the brake pads need replacing?", "evidence": "thinner than 1.5 mm"},
+    {"question": "When is the first free service due?", "evidence": "500 km or 3 months"},
+    {"question": "How tight should the pedals be?", "evidence": "pedals 35 Nm"},
+    {"question": "How long is the frame warranty?", "evidence": "frame is covered for 5 years"},
+    {"question": "Is the warranty still valid if I install a speed unlock kit?", "evidence": "speed unlocking kits"},
+    {"question": "Can I return a bike I have already ridden?", "evidence": "10 percent restocking fee"},
+    {"question": "What happens if my bike gets stolen?", "evidence": "lock the motor remotely"},
+    {"question": "Where do I throw away an old battery?", "evidence": "recycle them free of charge"}
+  ],
+  "unanswerable": [
+    "What is the price of the Voltra E3?",
+    "Who is the CEO of Voltra Mobility?",
+    "Does the bike come with a child seat?",
+    "What is the capital of France?",
+    "How many gears does the Voltra E3 have?",
+    "Can I take the bike on an airplane?"
+  ]
+}
