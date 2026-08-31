@@ -1,3 +1,106 @@
-# RAG-pipeline
+# RAG Pipeline: grounded Q&A over your PDFs
 
-Ask questions about a PDF and get answers grounded in its text, with page citations. Runs fully locally.
+Upload a PDF, ask a question, and get a short answer that cites the exact page it came from. If the PDF does not contain the answer, the app says so instead of making something up.
+
+Everything runs locally: models are served by [Ollama](https://ollama.com), so there are no API keys and no document ever leaves your machine. The pipeline is written from scratch in plain Python (`pypdf`, `numpy`, `requests`, `flask`) with no RAG framework, so every step is visible and easy to change.
+
+## How it works
+
+```mermaid
+flowchart LR
+    subgraph Indexing ["Indexing (once per PDF)"]
+        A[PDF] --> B[Text per page<br/>pypdf] --> C[Overlapping chunks<br/>page number kept]
+        C --> D[Embeddings<br/>nomic-embed-text]
+        D --> E[(Vector store<br/>numpy)]
+        C --> F[(BM25 keyword index)]
+    end
+    subgraph Answering ["Answering (per question)"]
+        Q[Question] --> R[Hybrid search<br/>vector + BM25, fused with RRF]
+        E --> R
+        F --> R
+        R --> G{Relevant enough?}
+        G -- no --> N[I could not find this in the document.]
+        G -- yes --> P[Prompt with numbered sources] --> L[LLM<br/>qwen2.5:3b]
+        L --> V[Citation verification] --> OUT[Answer + page citations]
+    end
+```
+
+1. **Load** (`rag/pdf_loader.py`): read the text of every page with `pypdf`, clean it up, and keep the page number.
+2. **Chunk** (`rag/chunker.py`): group sentences into chunks of about 800 characters. Neighbouring chunks overlap by 150 characters so a fact on a boundary is never cut in half. Chunks never cross a page, so every citation points to one exact page.
+3. **Embed** (`rag/embedder.py`): turn each chunk into a vector with `nomic-embed-text`, using its `search_document:` / `search_query:` prefixes.
+4. **Store** (`rag/vector_store.py`): a small vector database in numpy. Vectors are normalised, so a single matrix product gives the cosine similarity to every chunk. The index is saved to disk and reloaded on restart.
+5. **Retrieve** (`rag/retriever.py`, `rag/bm25.py`): run two searches.
+   - *Vector search* finds chunks with the same **meaning** ("headlight" → "front light").
+   - *BM25 keyword search*, implemented from scratch, finds **exact tokens** that embeddings blur, such as error codes (`E-21`), phone numbers and torque values.
+
+   The two rankings are merged with **Reciprocal Rank Fusion**: each chunk scores `1 / (60 + rank)` from each list, so chunks that both methods like rise to the top.
+6. **Guard** (`rag/pipeline.py`): if even the best chunk is barely similar to the question (cosine < 0.52), the question is off-topic and we answer "I could not find this in the document." without calling the LLM at all.
+7. **Generate** (`rag/prompt.py`, `rag/llm.py`): the top 5 chunks are numbered `[1]`–`[5]` and the model is told to answer only from them, cite a number after every sentence, and refuse if the answer is not there. Temperature is 0.
+8. **Verify citations** (`rag/citations.py`): small models often state the right fact but forget the citation or cite the wrong number. For each sentence we measure how many of its words appear in each source:
+   - a correct citation is kept;
+   - a wrong or missing citation is replaced with the source that actually supports the sentence;
+   - a sentence that no source supports is flagged, and the answer is marked **not grounded** in the UI.
+
+## Run it
+
+You need Python 3.10+ and [Ollama](https://ollama.com/download).
+
+```bash
+# 1. models (about 2.2 GB in total)
+ollama pull nomic-embed-text
+ollama pull qwen2.5:3b
+
+# 2. code
+git clone https://github.com/Jag2007/RAG-pipeline.git
+cd RAG-pipeline
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# 3. web app → http://localhost:5000
+python app.py
+
+# or ask from the terminal
+python ask.py eval/sample_manual.pdf "What does error E-21 mean?"
+```
+
+Any setting in `rag/config.py` can be changed with an environment variable of the same name, for example `CHAT_MODEL=llama3.2:3b python app.py`.
+
+## Tests
+
+```bash
+pytest
+```
+
+The 33 unit tests swap the Ollama models for small fakes (`tests/fakes.py`), so they run offline in under a second. They cover chunking, BM25, the vector store, rank fusion, citation verification and the full pipeline, including refusals and saving/reloading the index.
+
+## Project structure
+
+```
+rag/
+  config.py        all settings in one place
+  pdf_loader.py    PDF -> text per page
+  chunker.py       pages -> overlapping chunks
+  embedder.py      text -> vectors (Ollama)
+  vector_store.py  numpy vector store with save/load
+  bm25.py          keyword search from scratch
+  retriever.py     hybrid search + reciprocal rank fusion
+  prompt.py        grounded prompt with numbered sources
+  llm.py           chat model (Ollama)
+  citations.py     sentence-level citation verification
+  pipeline.py      ties every step together
+app.py             Flask API + web UI
+ask.py             command-line interface
+static/            HTML, CSS and JS for the UI
+eval/              sample PDF, labelled questions, evaluation script
+tests/             unit tests
+```
+
+## API
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| `POST` | `/api/upload` | form field `file` (PDF) | `{source, pages, chunks}` |
+| `POST` | `/api/ask` | `{"question": "..."}` | `{answer, sources[], cited[], grounded}` |
+| `GET` | `/api/documents` | | `[{source, chunks}]` |
+| `DELETE` | `/api/documents/<name>` | | `{ok}` |
+| `GET` | `/api/health` | | whether Ollama and both models are available |
