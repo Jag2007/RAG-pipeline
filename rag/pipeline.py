@@ -10,7 +10,8 @@ from .chunker import chunk_pages
 from .citations import verify_answer
 from .config import DATA_DIR, MIN_SIMILARITY, PROVIDER, TOP_K
 from .embedder import OllamaEmbedder
-from .gemini import GeminiEmbedder, GeminiLLM
+from .groq_llm import GroqLLM
+from .jina_embedder import JinaEmbedder
 from .llm import OllamaLLM
 from .pdf_loader import load_pdf
 from .prompt import NOT_FOUND, build_messages
@@ -22,9 +23,9 @@ class RAGPipeline:
     def __init__(self, embedder=None, llm=None, data_dir=DATA_DIR,
                  top_k=TOP_K, min_similarity=MIN_SIMILARITY):
         # embedder and llm can be swapped for fakes in tests
-        if PROVIDER == "gemini":
-            self.embedder = embedder or GeminiEmbedder()
-            self.llm = llm or GeminiLLM()
+        if PROVIDER == "cloud":
+            self.embedder = embedder or JinaEmbedder()
+            self.llm = llm or GroqLLM()
         else:
             self.embedder = embedder or OllamaEmbedder()
             self.llm = llm or OllamaLLM()

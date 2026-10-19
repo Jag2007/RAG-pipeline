@@ -5,19 +5,20 @@ so you can try a different model without touching the code.
 """
 import os
 
-# Which models answer the questions:
+# Which models do the two AI jobs (embeddings and answers):
 #   "ollama": local models on your machine, no API key needed (the default)
-#   "gemini": Google's Gemini API, for hosting where there is no room for local models
-# Setting GEMINI_API_KEY switches to Gemini automatically.
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-PROVIDER = os.getenv("PROVIDER", "gemini" if GEMINI_API_KEY else "ollama")
+#   "cloud":  Jina AI for embeddings + Groq for answers, for hosting where there
+#             is no room for local models. Setting GROQ_API_KEY switches to it.
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+JINA_API_KEY = os.getenv("JINA_API_KEY", "")
+PROVIDER = os.getenv("PROVIDER", "cloud" if GROQ_API_KEY else "ollama")
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 CHAT_MODEL = os.getenv("CHAT_MODEL", "qwen2.5:3b")
 
-GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "gemini-embedding-001")
-GEMINI_CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
+GROQ_CHAT_MODEL = os.getenv("GROQ_CHAT_MODEL", "llama-3.3-70b-versatile")
+JINA_EMBED_MODEL = os.getenv("JINA_EMBED_MODEL", "jina-embeddings-v3")
 
 # Chunking: roughly a paragraph per chunk, with some overlap so a fact that
 # sits on a chunk boundary still appears whole in at least one chunk.
