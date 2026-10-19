@@ -109,11 +109,11 @@ Any setting in `rag/config.py` can be changed with an environment variable of th
 
 ## Deploy on Render
 
-Render's free plan has 512 MB of memory, which is not enough to run local models. So the hosted version uses Google's Gemini API for the two model jobs: embeddings (`gemini-embedding-001`) and answers (`gemini-2.5-flash`). Everything else runs the same code as locally: chunking, BM25, rank fusion, the grounding guard and citation verification. Setting `GEMINI_API_KEY` switches the provider automatically (`rag/gemini.py`).
+Render's free plan has 512 MB of memory, which is not enough to run local models. So the hosted version gets the two model jobs from APIs with free tiers: embeddings from [Jina AI](https://jina.ai) (`jina-embeddings-v3`, `rag/jina_embedder.py`) and answers from [Groq](https://groq.com) (`llama-3.3-70b-versatile`, `rag/groq_llm.py`). Everything else runs the same code as locally: chunking, BM25, rank fusion, the grounding guard and citation verification. Setting `GROQ_API_KEY` switches the provider automatically.
 
-1. Get a free API key at [aistudio.google.com](https://aistudio.google.com) → **Get API key**.
+1. Get two free API keys: Groq at [console.groq.com/keys](https://console.groq.com/keys) and Jina at [jina.ai/api-dashboard](https://jina.ai/api-dashboard).
 2. On [render.com](https://render.com): **New → Blueprint** → pick this repository. Render reads `render.yaml` and builds the `Dockerfile`.
-3. Paste the key into `GEMINI_API_KEY` when asked → **Apply**.
+3. Paste the keys into `GROQ_API_KEY` and `JINA_API_KEY` when asked → **Apply**.
 
 Notes: the free instance sleeps after 15 minutes without visitors (the first request then takes about 30–50 s), and uploaded PDFs are cleared whenever it restarts.
 
@@ -130,7 +130,7 @@ docker run -p 5000:5000 -e OLLAMA_URL=http://host.docker.internal:11434 rag-pipe
 pytest
 ```
 
-The 36 unit tests swap the Ollama models for small fakes (`tests/fakes.py`), so they run offline in under a second. They cover chunking, BM25, the vector store, rank fusion, citation verification, the Gemini request format and the full pipeline, including refusals and saving/reloading the index.
+The 36 unit tests swap the Ollama models for small fakes (`tests/fakes.py`), so they run offline in under a second. They cover chunking, BM25, the vector store, rank fusion, citation verification, the Groq and Jina request formats and the full pipeline, including refusals and saving/reloading the index.
 
 ## Project structure
 
@@ -145,7 +145,8 @@ rag/
   retriever.py     hybrid search + reciprocal rank fusion
   prompt.py        grounded prompt with numbered sources
   llm.py           chat model (Ollama)
-  gemini.py        the same two model jobs through the Gemini API, for hosting
+  jina_embedder.py embeddings through the Jina API, for hosting
+  groq_llm.py      answers through the Groq API, for hosting
   citations.py     sentence-level citation verification
   pipeline.py      ties every step together
 app.py             Flask API + web UI

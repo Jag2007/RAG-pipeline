@@ -7,8 +7,11 @@ services:
     healthCheckPath: /api/health
     envVars:
       # The free plan has 512 MB of memory, too little for local models, so
-      # embeddings and answers come from Gemini. Get a key at aistudio.google.com.
-      - key: GEMINI_API_KEY
+      # embeddings come from Jina AI and answers from Groq. Both have free keys:
+      # console.groq.com/keys and jina.ai/api-dashboard
+      - key: GROQ_API_KEY
+        sync: false
+      - key: JINA_API_KEY
         sync: false
       - key: PROVIDER
-        value: gemini
+        value: cloud
