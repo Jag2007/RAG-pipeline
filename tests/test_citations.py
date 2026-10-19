@@ -29,6 +29,13 @@ def test_missing_citation_is_added():
     assert cited == [2]
 
 
+def test_summary_sentence_can_combine_sources():
+    answer, cited, ok = verify_answer("The frame is covered for 5 years and the battery charges in 4.5 hours.", CHUNKS)
+    assert cited == [1, 2] and ok
+    assert answer.endswith("[1][2].")
+
+
 def test_unsupported_sentence_is_flagged():
-    _, cited, ok = verify_answer("The bike costs 90,000 rupees.", CHUNKS)
+    answer, cited, ok = verify_answer("The bike costs 90,000 rupees [1].", CHUNKS)
     assert cited == [] and not ok
+    assert answer == "The bike costs 90,000 rupees."

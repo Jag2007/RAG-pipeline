@@ -10,6 +10,7 @@ DOCS = [
 def test_tokenize_keeps_codes_and_drops_stopwords():
     assert tokenize("What is error E-21?") == ["error", "e-21"]
     assert "4.5" in tokenize("about 4.5 hours")
+    assert tokenize("two\u2011month") == tokenize("two-month")
 
 
 def test_exact_code_is_found():

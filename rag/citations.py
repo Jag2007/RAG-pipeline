@@ -8,7 +8,10 @@ cite the wrong number. So we do not trust the model's citations blindly:
    (the share of the sentence's words that the source also contains).
 3. Keep the model's citation if that source really supports the sentence,
    otherwise replace it with the source that supports it best.
-4. A sentence that no source supports is marked unsupported.
+4. A summary sentence can draw on several sources at once, so if no single
+   source is enough we check all the sources together and cite the two that
+   contribute most.
+5. A sentence that the sources do not support even together is marked unsupported.
 
 This is simple word overlap, not another AI model, so it is fast and easy to
 reason about.
@@ -37,7 +40,7 @@ def verify_answer(answer, chunks):
     for sentence in SENTENCE_END.split(answer.strip()):
         if not sentence:
             continue
-        text = CITATION.sub("", sentence).strip()
+        text = re.sub(r"\s+([.!?])$", r"\1", CITATION.sub("", sentence).strip())  # "word [1]." -> "word."
         if not tokenize(text):  # nothing to check, e.g. a stray "[1]"
             continue
 
@@ -45,9 +48,11 @@ def verify_answer(answer, chunks):
         claimed = [int(n) for n in CITATION.findall(sentence) if 1 <= int(n) <= len(chunks)]
         good = [n for n in claimed if scores[n - 1] >= SUPPORT_THRESHOLD]
         if not good:
-            best = max(range(len(chunks)), key=lambda i: scores[i])
-            if scores[best] >= SUPPORT_THRESHOLD:
-                good = [best + 1]
+            ranked = sorted(range(len(chunks)), key=lambda i: scores[i], reverse=True)
+            if scores[ranked[0]] >= SUPPORT_THRESHOLD:
+                good = [ranked[0] + 1]
+            elif support(text, " ".join(c["text"] for c in chunks)) >= SUPPORT_THRESHOLD:
+                good = sorted(i + 1 for i in ranked[:2])
 
         if good:
             cited.update(good)

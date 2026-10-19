@@ -20,8 +20,12 @@ STOPWORDS = set(
 )
 
 
+UNICODE_DASHES = re.compile(r"[\u2010-\u2015\u2212]")
+
+
 def tokenize(text):
-    return [t for t in TOKEN.findall(text.lower()) if t not in STOPWORDS]
+    text = UNICODE_DASHES.sub("-", text.lower())  # "two‑month" written with a non-ASCII hyphen
+    return [t for t in TOKEN.findall(text) if t not in STOPWORDS]
 
 
 class BM25:
