@@ -109,11 +109,17 @@ Any setting in `rag/config.py` can be changed with an environment variable of th
 
 ## Deploy on Render
 
-Render's free plan has 512 MB of memory, which is not enough to run local models. So the hosted version gets the two model jobs from APIs with free tiers: embeddings from [Jina AI](https://jina.ai) (`jina-embeddings-v3`, `rag/jina_embedder.py`) and answers from [Groq](https://groq.com) (`llama-3.3-70b-versatile`, `rag/groq_llm.py`). Everything else runs the same code as locally: chunking, BM25, rank fusion, the grounding guard and citation verification. Setting `GROQ_API_KEY` switches the provider automatically.
+Render's free plan has 512 MB of memory, which is not enough to run local models. So the hosted version needs only one free API key:
 
-1. Get two free API keys: Groq at [console.groq.com/keys](https://console.groq.com/keys) and Jina at [jina.ai/api-dashboard](https://jina.ai/api-dashboard).
+- **Answers** come from [Groq](https://groq.com) (`llama-3.3-70b-versatile`, `rag/groq_llm.py`).
+- **Search** is BM25 keyword search only, because Groq has no embedding model. On the evaluation set, BM25 alone puts the right chunk first 75% of the time, against 82% for the local hybrid search (see [Evaluation](#evaluation)).
+- **The grounding guard** refuses when no chunk shares a keyword with the question. Beyond that, the prompt's refusal rule and the citation check still apply.
+
+Chunking, BM25, the prompt and citation verification run the same code as locally. Setting `GROQ_API_KEY` switches the provider automatically.
+
+1. Get a free API key at [console.groq.com/keys](https://console.groq.com/keys).
 2. On [render.com](https://render.com): **New → Blueprint** → pick this repository. Render reads `render.yaml` and builds the `Dockerfile`.
-3. Paste the keys into `GROQ_API_KEY` and `JINA_API_KEY` when asked → **Apply**.
+3. Paste the key into `GROQ_API_KEY` when asked → **Apply**.
 
 Notes: the free instance sleeps after 15 minutes without visitors (the first request then takes about 30–50 s), and uploaded PDFs are cleared whenever it restarts.
 
@@ -130,7 +136,7 @@ docker run -p 5000:5000 -e OLLAMA_URL=http://host.docker.internal:11434 rag-pipe
 pytest
 ```
 
-The 36 unit tests swap the Ollama models for small fakes (`tests/fakes.py`), so they run offline in under a second. They cover chunking, BM25, the vector store, rank fusion, citation verification, the Groq and Jina request formats and the full pipeline, including refusals and saving/reloading the index.
+The 36 unit tests swap the Ollama models for small fakes (`tests/fakes.py`), so they run offline in under a second. They cover chunking, BM25, the vector store, rank fusion, citation verification, the Groq request format, keyword-only mode and the full pipeline, including refusals and saving/reloading the index.
 
 ## Project structure
 
@@ -145,7 +151,6 @@ rag/
   retriever.py     hybrid search + reciprocal rank fusion
   prompt.py        grounded prompt with numbered sources
   llm.py           chat model (Ollama)
-  jina_embedder.py embeddings through the Jina API, for hosting
   groq_llm.py      answers through the Groq API, for hosting
   citations.py     sentence-level citation verification
   pipeline.py      ties every step together
