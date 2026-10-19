@@ -15,11 +15,11 @@ async function api(path, options = {}) {
   return data;
 }
 
+// Only show a message when something is wrong; otherwise the page stays clean.
 async function checkHealth() {
-  const status = $("status");
   const data = await api("/api/health").catch(() => ({ ok: false, error: "Server not reachable." }));
-  status.className = "status " + (data.ok ? "ok" : "err");
-  status.textContent = data.ok ? `Ready · ${data.chat_model} + ${data.embed_model}` : data.error;
+  $("status").textContent = data.ok ? "" : data.error;
+  $("status").classList.toggle("hidden", data.ok);
 }
 
 async function loadDocuments() {

@@ -4,13 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PDF Q&amp;A</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
   <header>
     <h1>PDF Q&amp;A</h1>
     <p>Upload a PDF, ask a question, and get an answer that cites the page it came from.</p>
-    <span id="status" class="status">Checking models…</span>
+    <ol class="process" aria-label="How it works">
+      <li>Read PDF</li>
+      <li>Chunking</li>
+      <li>Retrieval</li>
+      <li>Grounded answer</li>
+      <li>Page citations</li>
+    </ol>
+    <span id="status" class="status err hidden"></span>
   </header>
 
   <main>
@@ -34,6 +41,6 @@
     </section>
   </main>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>
