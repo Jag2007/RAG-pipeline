@@ -107,13 +107,30 @@ python ask.py eval/sample_manual.pdf "What does error E-21 mean?"
 
 Any setting in `rag/config.py` can be changed with an environment variable of the same name, for example `CHAT_MODEL=llama3.2:3b python app.py`.
 
+## Deploy on Render
+
+Render's free plan has 512 MB of memory, which is not enough to run local models. So the hosted version uses Google's Gemini API for the two model jobs: embeddings (`gemini-embedding-001`) and answers (`gemini-2.5-flash`). Everything else runs the same code as locally: chunking, BM25, rank fusion, the grounding guard and citation verification. Setting `GEMINI_API_KEY` switches the provider automatically (`rag/gemini.py`).
+
+1. Get a free API key at [aistudio.google.com](https://aistudio.google.com) → **Get API key**.
+2. On [render.com](https://render.com): **New → Blueprint** → pick this repository. Render reads `render.yaml` and builds the `Dockerfile`.
+3. Paste the key into `GEMINI_API_KEY` when asked → **Apply**.
+
+Notes: the free instance sleeps after 15 minutes without visitors (the first request then takes about 30–50 s), and uploaded PDFs are cleared whenever it restarts.
+
+To run the same container locally against Ollama:
+
+```bash
+docker build -t rag-pipeline .
+docker run -p 5000:5000 -e OLLAMA_URL=http://host.docker.internal:11434 rag-pipeline
+```
+
 ## Tests
 
 ```bash
 pytest
 ```
 
-The 33 unit tests swap the Ollama models for small fakes (`tests/fakes.py`), so they run offline in under a second. They cover chunking, BM25, the vector store, rank fusion, citation verification and the full pipeline, including refusals and saving/reloading the index.
+The 36 unit tests swap the Ollama models for small fakes (`tests/fakes.py`), so they run offline in under a second. They cover chunking, BM25, the vector store, rank fusion, citation verification, the Gemini request format and the full pipeline, including refusals and saving/reloading the index.
 
 ## Project structure
 
@@ -128,10 +145,13 @@ rag/
   retriever.py     hybrid search + reciprocal rank fusion
   prompt.py        grounded prompt with numbered sources
   llm.py           chat model (Ollama)
+  gemini.py        the same two model jobs through the Gemini API, for hosting
   citations.py     sentence-level citation verification
   pipeline.py      ties every step together
 app.py             Flask API + web UI
 ask.py             command-line interface
+Dockerfile         container for hosting (gunicorn)
+render.yaml        Render blueprint
 static/            HTML, CSS and JS for the UI
 eval/              sample PDF, labelled questions, evaluation script
 tests/             unit tests
