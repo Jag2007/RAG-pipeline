@@ -24,9 +24,11 @@ class VectorStore:
     def __len__(self):
         return len(self.chunks)
 
-    def add(self, chunks, vectors):
-        vectors = normalize(np.asarray(vectors, dtype=np.float32))
-        self.vectors = vectors if self.vectors is None else np.vstack([self.vectors, vectors])
+    def add(self, chunks, vectors=None):
+        """Add chunks with their vectors. Vectors can be None in keyword-only mode."""
+        if vectors is not None:
+            vectors = normalize(np.asarray(vectors, dtype=np.float32))
+            self.vectors = vectors if self.vectors is None else np.vstack([self.vectors, vectors])
         self.chunks.extend(chunks)
 
     def similarities(self, query_vector):
@@ -44,7 +46,7 @@ class VectorStore:
     def remove_source(self, source):
         keep = [i for i, chunk in enumerate(self.chunks) if chunk["source"] != source]
         self.chunks = [self.chunks[i] for i in keep]
-        self.vectors = self.vectors[keep] if keep else None
+        self.vectors = self.vectors[keep] if keep and self.vectors is not None else None
 
     def save(self, folder):
         os.makedirs(folder, exist_ok=True)
@@ -56,7 +58,8 @@ class VectorStore:
     def load(self, folder):
         chunks_path = os.path.join(folder, "chunks.json")
         vectors_path = os.path.join(folder, "vectors.npy")
-        if os.path.exists(chunks_path) and os.path.exists(vectors_path):
+        if os.path.exists(chunks_path):
             with open(chunks_path) as f:
                 self.chunks = json.load(f)
+        if os.path.exists(vectors_path):
             self.vectors = np.load(vectors_path)

@@ -52,6 +52,24 @@ def test_index_is_saved_and_reloaded(tmp_path):
     assert reloaded.documents() == [{"source": "sample_manual.pdf", "chunks": 12}]
 
 
+def test_keyword_only_mode_without_embeddings():
+    # how the app runs on Render with only a Groq key
+    pipeline = RAGPipeline(llm=FakeLLM("Keep the tyres between 40 and 55 psi [1]."),
+                           data_dir=None, provider="groq")
+    pipeline.add_pdf(SAMPLE_PDF)
+    result = pipeline.ask("What tyre pressure should I use?")
+    assert result["grounded"]
+    assert result["sources"][0]["page"] == 5
+    assert result["sources"][0]["similarity"] is None
+
+
+def test_keyword_only_mode_refuses_when_no_keyword_matches():
+    pipeline = RAGPipeline(llm=FakeLLM("should not be used"), data_dir=None, provider="groq")
+    pipeline.add_pdf(SAMPLE_PDF)
+    assert pipeline.ask("capital of France?")["answer"] == NOT_FOUND
+    assert pipeline.llm.last_messages is None
+
+
 def test_reupload_replaces_instead_of_duplicating():
     pipeline = make_pipeline("x")
     pipeline.add_pdf(SAMPLE_PDF)

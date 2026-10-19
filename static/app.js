@@ -71,7 +71,7 @@ function renderAnswer(result) {
     : '<span class="badge warn">Not found in your PDF</span>';
   const sources = result.sources.map((s) => `
     <div class="source ${result.cited.includes(s.n) ? "cited" : ""}">
-      <b>[${s.n}] ${escapeHtml(s.source)} · page ${s.page} · similarity ${s.similarity}</b>
+      <b>[${s.n}] ${escapeHtml(s.source)} · page ${s.page}${s.similarity === null ? "" : ` · similarity ${s.similarity}`}</b>
       ${escapeHtml(s.text)}
     </div>`).join("");
   return `<p>${answer}</p>${badge}` +

@@ -12,7 +12,8 @@ def show(result):
     print("\n" + result["answer"] + "\n")
     for source in result["sources"]:
         mark = "*" if source["n"] in result["cited"] else " "
-        print(f" {mark}[{source['n']}] {source['source']} p.{source['page']}  (similarity {source['similarity']})")
+        similarity = "" if source["similarity"] is None else f"  (similarity {source['similarity']})"
+        print(f" {mark}[{source['n']}] {source['source']} p.{source['page']}{similarity}")
     print()
 
 

@@ -41,9 +41,16 @@ class HybridRetriever:
         results is a list of {"chunk": ..., "similarity": ...}, best first.
         best_similarity is the highest cosine similarity over all chunks and
         is what the grounding guard checks.
+
+        Without an embedder (keyword-only hosting) only BM25 runs, and the
+        similarities are None.
         """
         if len(self.store) == 0:
             return [], 0.0
+
+        if self.embedder is None:
+            order = self.bm25.search(question, top_k)
+            return [{"chunk": self.store.chunks[i], "similarity": None} for i in order], None
 
         similarities = self.store.similarities(self.embedder.embed_query(question))
         pool = top_k * 4  # look a bit deeper than we need, then fuse

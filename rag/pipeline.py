@@ -11,7 +11,6 @@ from .citations import verify_answer
 from .config import DATA_DIR, MIN_SIMILARITY, PROVIDER, TOP_K
 from .embedder import OllamaEmbedder
 from .groq_llm import GroqLLM
-from .jina_embedder import JinaEmbedder
 from .llm import OllamaLLM
 from .pdf_loader import load_pdf
 from .prompt import NOT_FOUND, build_messages
@@ -21,10 +20,10 @@ from .vector_store import VectorStore
 
 class RAGPipeline:
     def __init__(self, embedder=None, llm=None, data_dir=DATA_DIR,
-                 top_k=TOP_K, min_similarity=MIN_SIMILARITY):
+                 top_k=TOP_K, min_similarity=MIN_SIMILARITY, provider=PROVIDER):
         # embedder and llm can be swapped for fakes in tests
-        if PROVIDER == "cloud":
-            self.embedder = embedder or JinaEmbedder()
+        if provider == "groq":
+            self.embedder = None  # Groq has no embedding model: keyword search only
             self.llm = llm or GroqLLM()
         else:
             self.embedder = embedder or OllamaEmbedder()
@@ -33,7 +32,7 @@ class RAGPipeline:
         self.min_similarity = min_similarity
         # vectors from different embedding models cannot be mixed, so each
         # provider keeps its own saved index
-        self.index_dir = os.path.join(data_dir, "index", PROVIDER) if data_dir else None
+        self.index_dir = os.path.join(data_dir, "index", provider) if data_dir else None
 
         self.store = VectorStore()
         if self.index_dir:
@@ -49,7 +48,7 @@ class RAGPipeline:
 
         self.store.remove_source(source)  # re-uploading a file replaces it
         chunks = chunk_pages(pages, source)
-        vectors = self.embedder.embed_documents([c["text"] for c in chunks])
+        vectors = self.embedder.embed_documents([c["text"] for c in chunks]) if self.embedder else None
         self.store.add(chunks, vectors)
         self._changed()
         return {"source": source, "pages": len(pages), "chunks": len(chunks)}
@@ -74,8 +73,10 @@ class RAGPipeline:
         results, best_similarity = self.retriever.retrieve(question, self.top_k)
 
         # Grounding guard: nothing relevant in the document, so do not ask the
-        # LLM at all. This is the main defence against made-up answers.
-        if not results or best_similarity < self.min_similarity:
+        # LLM at all. With embeddings the best chunk must be similar enough;
+        # in keyword-only mode at least one chunk must share a keyword.
+        too_far = best_similarity is not None and best_similarity < self.min_similarity
+        if not results or too_far:
             return {"answer": NOT_FOUND, "sources": [], "cited": [], "grounded": False}
 
         chunks = [r["chunk"] for r in results]
@@ -86,7 +87,8 @@ class RAGPipeline:
         answer, cited, all_supported = verify_answer(answer, chunks)
         sources = [
             {"n": n, "source": r["chunk"]["source"], "page": r["chunk"]["page"],
-             "text": r["chunk"]["text"], "similarity": round(r["similarity"], 3)}
+             "text": r["chunk"]["text"],
+             "similarity": round(r["similarity"], 3) if r["similarity"] is not None else None}
             for n, r in enumerate(results, start=1)
         ]
         # Grounded = every sentence of the answer is backed by a source.

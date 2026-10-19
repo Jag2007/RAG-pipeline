@@ -1,5 +1,5 @@
-"""Check the Jina and Groq clients send the right requests, without calling the real APIs."""
-from rag import groq_llm, jina_embedder
+"""Check the Groq client sends the right request, without calling the real API."""
+from rag import groq_llm
 
 
 class FakeResponse:
@@ -22,26 +22,6 @@ def capture(monkeypatch, module, reply):
 
     monkeypatch.setattr(module.requests, "post", fake_post)
     return calls
-
-
-def embeddings_reply(body):
-    return {"data": [{"embedding": [1.0, 0.0]} for _ in body["input"]]}
-
-
-def test_jina_batches_documents(monkeypatch):
-    calls = capture(monkeypatch, jina_embedder, embeddings_reply)
-    vectors = jina_embedder.JinaEmbedder(api_key="k").embed_documents(["t"] * 100)
-
-    assert vectors.shape == (100, 2)
-    assert len(calls) == 2  # 64 + 36
-    assert calls[0]["headers"] == {"Authorization": "Bearer k"}
-    assert calls[0]["json"]["task"] == "retrieval.passage"
-
-
-def test_jina_query_uses_query_task(monkeypatch):
-    calls = capture(monkeypatch, jina_embedder, embeddings_reply)
-    jina_embedder.JinaEmbedder(api_key="k").embed_query("question")
-    assert calls[0]["json"]["task"] == "retrieval.query"
 
 
 def test_groq_sends_messages_unchanged(monkeypatch):
