@@ -4,6 +4,16 @@ Upload a PDF, ask a question, and get a short answer that cites the exact page i
 
 Everything runs locally: models are served by [Ollama](https://ollama.com), so there are no API keys and no document ever leaves your machine. The pipeline is written from scratch in plain Python (`pypdf`, `numpy`, `requests`, `flask`) with no RAG framework, so every step is visible and easy to change.
 
+**Results on the included evaluation set** (28 answerable + 6 out-of-scope questions, see [Evaluation](#evaluation)):
+
+| Metric | Result |
+|---|---|
+| Correct chunk ranked first (hybrid search) | **82%** (vector only: 68%) |
+| Correct chunk in top 3 | **93%** |
+| Answers citing the source that contains the answer | **86%** (43% with the first prompt and no verification) |
+| Out-of-scope questions correctly refused | **100%** (6 / 6) |
+| Average answer time on a laptop CPU (`qwen2.5:3b`) | **~1.5 s** |
+
 ## How it works
 
 ```mermaid
@@ -40,6 +50,38 @@ flowchart LR
    - a correct citation is kept;
    - a wrong or missing citation is replaced with the source that actually supports the sentence;
    - a sentence that no source supports is flagged, and the answer is marked **not grounded** in the UI.
+
+## Evaluation
+
+`eval/questions.json` has 28 questions about a 6-page sample manual (`eval/sample_manual.pdf`). Each one is labelled with the phrase that proves the answer. There are also 6 questions the manual cannot answer. Run it with:
+
+```bash
+python eval/evaluate.py              # retrieval + answers (needs Ollama)
+python eval/evaluate.py --retrieval  # retrieval only
+```
+
+**Retrieval** (chunk size 800):
+
+| Search | hit@1 | hit@3 | hit@5 | MRR |
+|---|---|---|---|---|
+| Vector only | 68% | 93% | 96% | 0.79 |
+| BM25 only | 75% | 89% | 93% | 0.83 |
+| **Hybrid (RRF)** | **82%** | **93%** | 93% | **0.87** |
+
+**Chunk size sweep** (MRR, overlap = 20% of chunk size):
+
+| Chunk size | Vector | BM25 | Hybrid |
+|---|---|---|---|
+| 400 | 0.89 | 0.81 | 0.87 |
+| 600 | 0.90 | 0.81 | 0.88 |
+| 800 | 0.79 | 0.83 | 0.87 |
+| 1200 | 0.85 | 0.79 | 0.88 |
+
+Vector-only search swings between 0.79 and 0.90 depending on chunk size, while hybrid search stays at 0.87–0.88. That stability is the main reason the pipeline uses hybrid retrieval. The evaluation set is small, so treat these numbers as a sanity check rather than a benchmark.
+
+**Answers**: 86% of answers cite the chunk that contains the answer, and 6 / 6 out-of-scope questions ("What is the price?", "Who is the CEO?", "What is the capital of France?") are refused. The first version (a single plain prompt, no verification step) cited the right source in only 43% of answers, mostly because the model left citations out. A chat-style prompt with a worked example and the sentence-level verification step raised that to 86%.
+
+Failures are still visible. For example, the model answered "frame size M" for a 180 cm rider (the manual says L). That sentence matches no source, so the verifier marks the answer as not grounded instead of showing it as trustworthy.
 
 ## Run it
 
@@ -104,3 +146,11 @@ tests/             unit tests
 | `GET` | `/api/documents` | | `[{source, chunks}]` |
 | `DELETE` | `/api/documents/<name>` | | `{ok}` |
 | `GET` | `/api/health` | | whether Ollama and both models are available |
+
+## Limitations and next steps
+
+- Scanned PDFs have no text layer; adding OCR (for example Tesseract) would cover them.
+- Tables are read as plain text, so answers about table cells can be weaker.
+- The vector store does a full scan, which is fine up to tens of thousands of chunks. Beyond that, an approximate index such as FAISS or HNSW would be needed.
+- Citation verification uses word overlap, so a correct paraphrase with very different wording can be flagged as unsupported. That errs on the side of caution.
+- A reranker model (a cross-encoder) on the top 20 chunks would likely raise hit@1 further.
