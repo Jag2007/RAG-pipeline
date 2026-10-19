@@ -3,8 +3,10 @@ from rag import groq_llm
 
 
 class FakeResponse:
-    def __init__(self, data):
+    def __init__(self, data, status_code=200, headers=None):
         self.data = data
+        self.status_code = status_code
+        self.headers = headers or {}
 
     def raise_for_status(self):
         pass
@@ -32,3 +34,17 @@ def test_groq_sends_messages_unchanged(monkeypatch):
     assert answer == "Hi [1]."
     assert calls[0]["json"]["messages"] == messages
     assert calls[0]["json"]["temperature"] == 0
+
+
+def test_gpt_oss_models_use_low_reasoning_effort(monkeypatch):
+    calls = capture(monkeypatch, groq_llm, lambda body: {"choices": [{"message": {"content": "ok"}}]})
+    groq_llm.GroqLLM(model="openai/gpt-oss-120b", api_key="k").chat([{"role": "user", "content": "q"}])
+    assert calls[0]["json"]["reasoning_effort"] == "low"
+
+
+def test_rate_limit_is_retried(monkeypatch):
+    replies = [FakeResponse({}, 429, {"retry-after": "0"}),
+               FakeResponse({"choices": [{"message": {"content": "ok"}}]})]
+    monkeypatch.setattr(groq_llm.requests, "post", lambda *args, **kwargs: replies.pop(0))
+    monkeypatch.setattr(groq_llm.time, "sleep", lambda seconds: None)
+    assert groq_llm.GroqLLM(api_key="k").chat([{"role": "user", "content": "q"}]) == "ok"
