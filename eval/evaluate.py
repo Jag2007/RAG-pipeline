@@ -5,7 +5,8 @@
 
 Retrieval: for each question we know a phrase ("evidence") that must be in the
 right chunk. We check where that chunk lands in the ranking for vector-only,
-keyword-only (BM25) and hybrid search:
+keyword-only (BM25) and hybrid search. In hosted mode (GROQ_API_KEY set, no
+embeddings) we compare keyword search with and without query rewriting:
   hit@k = share of questions whose evidence is in the top k chunks
   MRR   = average of 1 / rank of the first correct chunk (1.0 = always first)
 
@@ -22,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from rag.pipeline import RAGPipeline  # noqa: E402
 from rag.prompt import NOT_FOUND  # noqa: E402
+from rag.query_rewrite import rewrite_query  # noqa: E402
 from rag.retriever import HybridRetriever  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -35,17 +37,29 @@ def first_hit_rank(results, evidence):
     return None
 
 
+def metrics(ranks):
+    return {
+        "hit@1": sum(r == 1 for r in ranks if r) / len(ranks),
+        "hit@3": sum(r <= 3 for r in ranks if r) / len(ranks),
+        "hit@5": sum(r <= 5 for r in ranks if r) / len(ranks),
+        "mrr": sum(1 / r for r in ranks if r) / len(ranks),
+    }
+
+
 def evaluate_retrieval(pipeline, questions):
     report = {}
+    if pipeline.embedder is None:  # hosted mode: keyword search only
+        searches = {"keyword": lambda q: q, "kw+rewrite": lambda q: rewrite_query(pipeline.llm, q)}
+        for name, make_query in searches.items():
+            ranks = [first_hit_rank(pipeline.retriever.retrieve(make_query(q["question"]), DEPTH)[0], q["evidence"])
+                     for q in questions]
+            report[name] = metrics(ranks)
+        return report
+
     for mode in ("vector", "keyword", "hybrid"):
         retriever = HybridRetriever(pipeline.store, pipeline.embedder, mode=mode)
         ranks = [first_hit_rank(retriever.retrieve(q["question"], DEPTH)[0], q["evidence"]) for q in questions]
-        report[mode] = {
-            "hit@1": sum(r == 1 for r in ranks if r) / len(ranks),
-            "hit@3": sum(r <= 3 for r in ranks if r) / len(ranks),
-            "hit@5": sum(r <= 5 for r in ranks if r) / len(ranks),
-            "mrr": sum(1 / r for r in ranks if r) / len(ranks),
-        }
+        report[mode] = metrics(ranks)
     return report
 
 
@@ -83,9 +97,9 @@ def main():
     print(f"Indexed {info['source']}: {info['pages']} pages, {info['chunks']} chunks\n")
 
     print("Retrieval")
-    print(f"  {'mode':<8} {'hit@1':>6} {'hit@3':>6} {'hit@5':>6} {'MRR':>6}")
+    print(f"  {'mode':<10} {'hit@1':>6} {'hit@3':>6} {'hit@5':>6} {'MRR':>6}")
     for mode, m in evaluate_retrieval(pipeline, data["answerable"]).items():
-        print(f"  {mode:<8} {m['hit@1']:>6.0%} {m['hit@3']:>6.0%} {m['hit@5']:>6.0%} {m['mrr']:>6.2f}")
+        print(f"  {mode:<10} {m['hit@1']:>6.0%} {m['hit@3']:>6.0%} {m['hit@5']:>6.0%} {m['mrr']:>6.2f}")
 
     if "--retrieval" in sys.argv:
         return

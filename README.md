@@ -2,7 +2,7 @@
 
 Upload a PDF, ask a question, and get a short answer that cites the exact page it came from. If the PDF does not contain the answer, the app says so instead of making something up.
 
-Everything runs locally: models are served by [Ollama](https://ollama.com), so there are no API keys and no document ever leaves your machine. The pipeline is written from scratch in plain Python (`pypdf`, `numpy`, `requests`, `flask`) with no RAG framework, so every step is visible and easy to change.
+By default everything runs locally: models are served by [Ollama](https://ollama.com), so there are no API keys and no document ever leaves your machine. The hosted demo instead uses one free Groq key (see [Deploy on Render](#deploy-on-render)). The pipeline is written from scratch in plain Python (`pypdf`, `numpy`, `requests`, `flask`) with no RAG framework, so every step is visible and easy to change.
 
 **Results on the included evaluation set** (28 answerable + 6 out-of-scope questions, see [Evaluation](#evaluation)):
 
@@ -111,11 +111,23 @@ Any setting in `rag/config.py` can be changed with an environment variable of th
 
 Render's free plan has 512 MB of memory, which is not enough to run local models. So the hosted version needs only one free API key:
 
-- **Answers** come from [Groq](https://groq.com) (`llama-3.3-70b-versatile`, `rag/groq_llm.py`).
-- **Search** is BM25 keyword search only, because Groq has no embedding model. On the evaluation set, BM25 alone puts the right chunk first 75% of the time, against 82% for the local hybrid search (see [Evaluation](#evaluation)).
-- **The grounding guard** refuses when no chunk shares a keyword with the question. Beyond that, the prompt's refusal rule and the citation check still apply.
+- **Answers** come from [Groq](https://groq.com) (`openai/gpt-oss-120b`, `rag/groq_llm.py`). If the free tier's rate limit is hit, the client waits as long as Groq's `retry-after` header says and tries again.
+- **Search** is BM25 keyword search, because Groq has no embedding model. Keyword search alone misses questions whose words are not in the document ("what is **sop**?" when the PDF says "Statement of Purpose"), so two things make up for it:
+  - **Query rewriting** (`rag/query_rewrite.py`): before searching, the LLM turns the question into search keywords, adding synonyms and spelled-out abbreviations.
+  - **Overview fallback:** if no chunk shares a keyword with the question, the model gets the opening chunks of each document, which answers "what is this PDF about?".
+- **Grounding** without a similarity score is done by the prompt's refusal rule and the citation check, which still runs on every answer.
 
 Chunking, BM25, the prompt and citation verification run the same code as locally. Setting `GROQ_API_KEY` switches the provider automatically.
+
+**Hosted mode on the evaluation set** (`GROQ_API_KEY=... python eval/evaluate.py`):
+
+| Metric | Keyword only | Keyword + query rewriting |
+|---|---|---|
+| Correct chunk ranked first | 75% | 75% |
+| Correct chunk in top 3 / top 5 | 89% / 93% | **96% / 100%** |
+| MRR | 0.83 | **0.86** |
+
+With `gpt-oss-120b`, 89% of answers cite the source that contains the answer, and 6 / 6 out-of-scope questions are refused. The three misses were correct answers the checker could not match word for word ("624 watt-hours" against "624 Wh"), so it errs toward caution.
 
 1. Get a free API key at [console.groq.com/keys](https://console.groq.com/keys).
 2. On [render.com](https://render.com): **New → Blueprint** → pick this repository. Render reads `render.yaml` and builds the `Dockerfile`.
@@ -136,7 +148,7 @@ docker run -p 5000:5000 -e OLLAMA_URL=http://host.docker.internal:11434 rag-pipe
 pytest
 ```
 
-The 36 unit tests swap the Ollama models for small fakes (`tests/fakes.py`), so they run offline in under a second. They cover chunking, BM25, the vector store, rank fusion, citation verification, the Groq request format, keyword-only mode and the full pipeline, including refusals and saving/reloading the index.
+The 40 unit tests swap the models for small fakes (`tests/fakes.py`), so they run offline in under a second. They cover chunking, BM25, the vector store, rank fusion, citation verification, the Groq client (including rate-limit retries), keyword-only mode with query rewriting and the overview fallback, and the full pipeline, including refusals and saving/reloading the index.
 
 ## Project structure
 
@@ -152,6 +164,7 @@ rag/
   prompt.py        grounded prompt with numbered sources
   llm.py           chat model (Ollama)
   groq_llm.py      answers through the Groq API, for hosting
+  query_rewrite.py LLM keyword expansion for keyword-only search
   citations.py     sentence-level citation verification
   pipeline.py      ties every step together
 app.py             Flask API + web UI
