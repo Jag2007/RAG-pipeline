@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: rag-pipeline
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      # The free plan has 512 MB of memory, too little for local models, so
+      # embeddings and answers come from Gemini. Get a key at aistudio.google.com.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PROVIDER
+        value: gemini
