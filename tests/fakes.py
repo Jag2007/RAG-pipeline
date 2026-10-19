@@ -4,6 +4,7 @@ import hashlib
 import numpy as np
 
 from rag.bm25 import tokenize
+from rag.query_rewrite import REWRITE_PROMPT
 
 DIM = 64
 
@@ -25,12 +26,18 @@ class FakeEmbedder:
 
 
 class FakeLLM:
-    """Returns a canned reply and remembers the last messages it was sent."""
+    """Returns a canned reply and remembers the last messages it was sent.
 
-    def __init__(self, reply):
+    Query-rewrite requests get `keywords` back instead of the reply.
+    """
+
+    def __init__(self, reply, keywords=""):
         self.reply = reply
+        self.keywords = keywords
         self.last_messages = None
 
     def chat(self, messages):
+        if messages[0]["content"] == REWRITE_PROMPT:
+            return self.keywords
         self.last_messages = messages
         return self.reply

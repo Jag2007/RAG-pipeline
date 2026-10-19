@@ -14,6 +14,7 @@ from .groq_llm import GroqLLM
 from .llm import OllamaLLM
 from .pdf_loader import load_pdf
 from .prompt import NOT_FOUND, build_messages
+from .query_rewrite import rewrite_query
 from .retriever import HybridRetriever
 from .vector_store import VectorStore
 
@@ -70,11 +71,14 @@ class RAGPipeline:
 
     # ---------- answering ----------
     def ask(self, question):
-        results, best_similarity = self.retriever.retrieve(question, self.top_k)
+        # Keyword-only mode cannot match meaning, so let the LLM add synonyms first.
+        search_query = rewrite_query(self.llm, question) if self.embedder is None else question
+        results, best_similarity = self.retriever.retrieve(search_query, self.top_k)
 
         # Grounding guard: nothing relevant in the document, so do not ask the
-        # LLM at all. With embeddings the best chunk must be similar enough;
-        # in keyword-only mode at least one chunk must share a keyword.
+        # LLM at all. With embeddings the best chunk must be similar enough.
+        # In keyword-only mode there is no similarity score, so the LLM's
+        # refusal rule and the citation check do this job.
         too_far = best_similarity is not None and best_similarity < self.min_similarity
         if not results or too_far:
             return {"answer": NOT_FOUND, "sources": [], "cited": [], "grounded": False}

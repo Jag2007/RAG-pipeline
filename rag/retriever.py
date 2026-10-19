@@ -35,6 +35,15 @@ class HybridRetriever:
         """Rebuild the keyword index after chunks are added or removed."""
         self.bm25.fit([chunk["text"] for chunk in self.store.chunks])
 
+    def opening_chunks(self, top_k, per_document=2):
+        """Indexes of the first few chunks of every document."""
+        seen, order = {}, []
+        for i, chunk in enumerate(self.store.chunks):
+            seen[chunk["source"]] = seen.get(chunk["source"], 0) + 1
+            if seen[chunk["source"]] <= per_document:
+                order.append(i)
+        return order[:top_k]
+
     def retrieve(self, question, top_k):
         """Return (results, best_similarity).
 
@@ -42,14 +51,17 @@ class HybridRetriever:
         best_similarity is the highest cosine similarity over all chunks and
         is what the grounding guard checks.
 
-        Without an embedder (keyword-only hosting) only BM25 runs, and the
-        similarities are None.
+        Without an embedder (keyword-only hosting) only BM25 runs and the
+        similarities are None. If no chunk shares a keyword with the question,
+        we return the opening chunks of each document instead: that is where a
+        document says what it is about, which answers overview questions, and
+        the LLM still refuses when they do not contain the answer.
         """
         if len(self.store) == 0:
             return [], 0.0
 
         if self.embedder is None:
-            order = self.bm25.search(question, top_k)
+            order = self.bm25.search(question, top_k) or self.opening_chunks(top_k)
             return [{"chunk": self.store.chunks[i], "similarity": None} for i in order], None
 
         similarities = self.store.similarities(self.embedder.embed_query(question))

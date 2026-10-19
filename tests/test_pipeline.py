@@ -63,11 +63,23 @@ def test_keyword_only_mode_without_embeddings():
     assert result["sources"][0]["similarity"] is None
 
 
-def test_keyword_only_mode_refuses_when_no_keyword_matches():
-    pipeline = RAGPipeline(llm=FakeLLM("should not be used"), data_dir=None, provider="groq")
+def test_keyword_only_mode_uses_rewritten_query():
+    # "sop" is not in the manual, but the rewrite adds words that are
+    llm = FakeLLM("Keep the tyres between 40 and 55 psi [1].", keywords="tyre pressure psi")
+    pipeline = RAGPipeline(llm=llm, data_dir=None, provider="groq")
     pipeline.add_pdf(SAMPLE_PDF)
-    assert pipeline.ask("capital of France?")["answer"] == NOT_FOUND
-    assert pipeline.llm.last_messages is None
+    result = pipeline.ask("what about sop?")
+    assert result["sources"][0]["page"] == 5
+
+
+def test_keyword_only_mode_falls_back_to_document_opening():
+    llm = FakeLLM(NOT_FOUND, keywords="")
+    pipeline = RAGPipeline(llm=llm, data_dir=None, provider="groq")
+    pipeline.add_pdf(SAMPLE_PDF)
+    result = pipeline.ask("capital of France?")
+    assert result["answer"] == NOT_FOUND
+    # the model was shown the start of the manual and refused
+    assert "[1] (sample_manual.pdf, page 1)" in llm.last_messages[-1]["content"]
 
 
 def test_reupload_replaces_instead_of_duplicating():
