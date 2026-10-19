@@ -7,7 +7,8 @@ import os
 import requests
 from flask import Flask, jsonify, request, send_from_directory
 
-from rag.config import CHAT_MODEL, DATA_DIR, EMBED_MODEL, OLLAMA_URL
+from rag.config import (CHAT_MODEL, DATA_DIR, EMBED_MODEL, GEMINI_API_KEY, GEMINI_CHAT_MODEL,
+                        GEMINI_EMBED_MODEL, OLLAMA_URL, PROVIDER)
 from rag.pipeline import RAGPipeline
 
 UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
@@ -26,6 +27,10 @@ def index():
 
 @app.get("/api/health")
 def health():
+    if PROVIDER == "gemini":
+        if not GEMINI_API_KEY:
+            return jsonify({"ok": False, "error": "GEMINI_API_KEY is not set."})
+        return jsonify({"ok": True, "embed_model": GEMINI_EMBED_MODEL, "chat_model": GEMINI_CHAT_MODEL})
     try:
         installed = [m["name"] for m in requests.get(f"{OLLAMA_URL}/api/tags", timeout=3).json()["models"]]
     except requests.RequestException:
@@ -55,7 +60,7 @@ def upload():
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
     except requests.RequestException:
-        return jsonify({"error": "Could not reach Ollama to embed the text."}), 503
+        return jsonify({"error": "Could not reach the embedding model."}), 503
     return jsonify(info)
 
 
@@ -75,7 +80,7 @@ def ask():
     try:
         return jsonify(pipeline.ask(question))
     except requests.RequestException:
-        return jsonify({"error": "Could not reach the local model through Ollama."}), 503
+        return jsonify({"error": "Could not reach the answer model."}), 503
 
 
 if __name__ == "__main__":

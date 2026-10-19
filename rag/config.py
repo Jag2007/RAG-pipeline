@@ -5,10 +5,19 @@ so you can try a different model without touching the code.
 """
 import os
 
-# Ollama runs the models locally, so no API key is needed.
+# Which models answer the questions:
+#   "ollama": local models on your machine, no API key needed (the default)
+#   "gemini": Google's Gemini API, for hosting where there is no room for local models
+# Setting GEMINI_API_KEY switches to Gemini automatically.
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+PROVIDER = os.getenv("PROVIDER", "gemini" if GEMINI_API_KEY else "ollama")
+
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 CHAT_MODEL = os.getenv("CHAT_MODEL", "qwen2.5:3b")
+
+GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "gemini-embedding-001")
+GEMINI_CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
 
 # Chunking: roughly a paragraph per chunk, with some overlap so a fact that
 # sits on a chunk boundary still appears whole in at least one chunk.

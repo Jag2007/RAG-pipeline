@@ -8,8 +8,9 @@ import os
 
 from .chunker import chunk_pages
 from .citations import verify_answer
-from .config import DATA_DIR, MIN_SIMILARITY, TOP_K
+from .config import DATA_DIR, MIN_SIMILARITY, PROVIDER, TOP_K
 from .embedder import OllamaEmbedder
+from .gemini import GeminiEmbedder, GeminiLLM
 from .llm import OllamaLLM
 from .pdf_loader import load_pdf
 from .prompt import NOT_FOUND, build_messages
@@ -21,11 +22,17 @@ class RAGPipeline:
     def __init__(self, embedder=None, llm=None, data_dir=DATA_DIR,
                  top_k=TOP_K, min_similarity=MIN_SIMILARITY):
         # embedder and llm can be swapped for fakes in tests
-        self.embedder = embedder or OllamaEmbedder()
-        self.llm = llm or OllamaLLM()
+        if PROVIDER == "gemini":
+            self.embedder = embedder or GeminiEmbedder()
+            self.llm = llm or GeminiLLM()
+        else:
+            self.embedder = embedder or OllamaEmbedder()
+            self.llm = llm or OllamaLLM()
         self.top_k = top_k
         self.min_similarity = min_similarity
-        self.index_dir = os.path.join(data_dir, "index") if data_dir else None
+        # vectors from different embedding models cannot be mixed, so each
+        # provider keeps its own saved index
+        self.index_dir = os.path.join(data_dir, "index", PROVIDER) if data_dir else None
 
         self.store = VectorStore()
         if self.index_dir:
